@@ -1,0 +1,194 @@
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+local animations = {}
+local selectedAnimation = nil
+local guiVisible = true
+local animationTrack = nil
+
+local function collectAnimations()
+    for _, obj in pairs(game:GetDescendants()) do
+        if obj:IsA("Animation") and obj.AnimationId ~= "" then
+            local animData = {
+                id = obj.AnimationId,
+                name = obj.Name
+            }
+            table.insert(animations, animData)
+            print("Found animation:", obj.Name, "with ID:", obj.AnimationId)
+        end
+    end
+end
+
+local function createAnimationGui()
+    local existingGui = player:WaitForChild("PlayerGui"):FindFirstChild("AnimationSelectorGui")
+    if existingGui then existingGui:Destroy() end
+
+    local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+    screenGui.Name = "AnimationSelectorGui"
+    screenGui.Enabled = guiVisible
+
+    local frame = Instance.new("Frame", screenGui)
+    frame.Size = UDim2.new(0.4, 0, 0.7, 0)
+    frame.Position = UDim2.new(0.3, 0, 0.15, 0)
+    frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    frame.BorderSizePixel = 0
+    frame.Active = true  -- Enables input detection for dragging
+
+    local uiCorner = Instance.new("UICorner", frame)
+    uiCorner.CornerRadius = UDim.new(0, 15)
+
+    local glow = Instance.new("ImageLabel", frame)
+    glow.Size = UDim2.new(1, 60, 1, 60)
+    glow.Position = UDim2.new(0, -30, 0, -30)
+    glow.BackgroundTransparency = 1
+    glow.Image = "rbxassetid://6870128366"
+    glow.ImageColor3 = Color3.fromRGB(255, 255, 255)
+    glow.ImageTransparency = 0.4
+
+    local title = Instance.new("TextLabel", frame)
+    title.Text = "Select an Animation"
+    title.Size = UDim2.new(1, 0, 0.1, 0)
+    title.Position = UDim2.new(0, 0, 0, -20)
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 22
+    title.BackgroundTransparency = 1
+
+    local outline = Instance.new("UIStroke", frame)
+    outline.Thickness = 3
+    outline.Color = Color3.fromHSV(0, 1, 1)
+    outline.Transparency = 0.2
+    local outlineRainbow = coroutine.wrap(function()
+        while true do
+            for hue = 0, 1, 0.01 do
+                outline.Color = Color3.fromHSV(hue, 1, 1)
+                wait(0.03)
+            end
+        end
+    end)
+    outlineRainbow()
+
+    local searchBox = Instance.new("TextBox", frame)
+    searchBox.Size = UDim2.new(1, -20, 0, 30)
+    searchBox.Position = UDim2.new(0, 10, 0.15, 0)
+    searchBox.PlaceholderText = "Search animations..."
+    searchBox.Text = ""
+    searchBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+    searchBox.Font = Enum.Font.Gotham
+    searchBox.TextSize = 18
+    searchBox.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+
+    local scrollingFrame = Instance.new("ScrollingFrame", frame)
+    scrollingFrame.Size = UDim2.new(1, -20, 0.7, 0)
+    scrollingFrame.Position = UDim2.new(0, 10, 0.25, 0)
+    scrollingFrame.BackgroundTransparency = 1
+    scrollingFrame.ScrollBarThickness = 8
+    scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+    local function updateAnimationList(searchTerm)
+        scrollingFrame:ClearAllChildren()
+        local totalHeight = 0
+        for _, animData in ipairs(animations) do
+            if animData.name:lower():find(searchTerm:lower()) or animData.id:find(searchTerm) then
+                local button = Instance.new("TextButton", scrollingFrame)
+                button.Size = UDim2.new(1, -10, 0, 30)
+                button.Position = UDim2.new(0, 5, 0, totalHeight)
+                button.Text = animData.name .. " (" .. animData.id .. ")"
+                button.TextColor3 = Color3.fromRGB(255, 255, 255)
+                button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+                button.Font = Enum.Font.Gotham
+                button.TextSize = 16
+                button.BorderSizePixel = 0
+
+                button.MouseButton1Click:Connect(function()
+                    selectedAnimation = animData.id
+                    print("Selected Animation:", animData.name, "ID:", selectedAnimation)
+                end)
+
+                totalHeight = totalHeight + 35
+                scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, totalHeight)
+            end
+        end
+    end
+
+    updateAnimationList("")
+    searchBox:GetPropertyChangedSignal("Text"):Connect(function()
+        updateAnimationList(searchBox.Text)
+    end)
+
+    -- Custom drag logic
+    local dragging = false
+    local dragStart, startPos
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    frame.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(
+                startPos.X.Scale,
+                startPos.X.Offset + delta.X,
+                startPos.Y.Scale,
+                startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+end
+
+local function toggleGui()
+    guiVisible = not guiVisible
+    local screenGui = player:WaitForChild("PlayerGui"):FindFirstChild("AnimationSelectorGui")
+    if screenGui then
+        screenGui.Enabled = guiVisible
+    else
+        createAnimationGui()
+    end
+end
+
+local function toggleSelectedAnimation()
+    if selectedAnimation then
+        local character = player.Character or player.CharacterAdded:Wait()
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            if animationTrack and animationTrack.IsPlaying then
+                animationTrack:Stop()
+                animationTrack = nil
+            else
+                local anim = Instance.new("Animation")
+                anim.AnimationId = selectedAnimation
+                animationTrack = humanoid:LoadAnimation(anim)
+                animationTrack:Play()
+            end
+        end
+    end
+end
+
+local function onCharacterAdded()
+    wait(0.5)
+    createAnimationGui()
+end
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if not gameProcessed then
+        if input.KeyCode == Enum.KeyCode.P then
+            toggleSelectedAnimation()
+        elseif input.KeyCode == Enum.KeyCode.M then
+            toggleGui()
+        end
+    end
+end)
+
+collectAnimations()
+createAnimationGui()
+player.CharacterAdded:Connect(onCharacterAdded)
