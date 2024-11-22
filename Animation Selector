@@ -183,7 +183,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if not gameProcessed then
         if input.KeyCode == Enum.KeyCode.P then
             toggleSelectedAnimation()
-        elseif input.KeyCode == Enum.KeyCode.M then
+        elseif input.KeyCode == Enum.KeyCode.Z then  -- Changed from M to Z
             toggleGui()
         end
     end
